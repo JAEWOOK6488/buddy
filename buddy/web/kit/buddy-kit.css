@@ -1,0 +1,155 @@
+/* Base look for buddy visuals: transparent page floating over the desktop,
+   hand-drawn type, grid-paper cards and sticky-note labels. */
+
+@font-face {
+  font-family: "BuddyHand";
+  src: url("buddy://visual/vendor/fonts/ArchitectsDaughter-Regular.ttf") format("truetype");
+}
+@font-face {
+  font-family: "BuddyHandKo";
+  src: url("buddy://visual/vendor/fonts/Gaegu-Regular.ttf") format("truetype");
+}
+
+:root {
+  --buddy-ink: #2b2b2b;
+  --buddy-muted: #7a7a7a;
+  --buddy-paper: #fbfaf4;
+  --buddy-grid: rgba(60, 80, 120, 0.07);
+  --buddy-blue: #bcd8f6;
+  --buddy-blue-edge: #5b9bd5;
+  --buddy-red: #f7c9c2;
+  --buddy-red-edge: #e07a6f;
+  --buddy-green: #c9ecd2;
+  --buddy-green-edge: #5bbf7a;
+  --buddy-yellow: #fbefb8;
+  --buddy-yellow-edge: #e6c34a;
+  --buddy-purple: #ddd3fa;
+  --buddy-purple-edge: #9a84e8;
+  --buddy-pink: #fbd3e4;
+  --buddy-pink-edge: #e57aa6;
+  --buddy-font: "BuddyHand", "BuddyHandKo", "Comic Sans MS", sans-serif;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  color: var(--buddy-ink);
+  font-family: var(--buddy-font);
+  font-size: 20px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Grid-paper card for 2D explanations. */
+.buddy-card {
+  position: relative;
+  box-sizing: border-box;
+  margin: 16px auto;
+  max-width: calc(100% - 32px);
+  max-height: calc(100% - 32px);
+  overflow: auto;
+  padding: 18px 26px 22px;
+  background-color: var(--buddy-paper);
+  background-image:
+    linear-gradient(var(--buddy-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--buddy-grid) 1px, transparent 1px);
+  background-size: 22px 22px;
+  border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+.buddy-card-header {
+  margin: -18px -26px 14px;
+  padding: 7px 0;
+  text-align: center;
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--buddy-muted);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.buddy-card h1, .buddy-card h2, .buddy-card h3 { margin: 6px 0 12px; font-weight: 700; }
+.buddy-card h1 { font-size: 30px; }
+.buddy-card h2 { font-size: 24px; }
+.buddy-muted { color: var(--buddy-muted); }
+
+/* Boxes with a soft fill and a darker edge (input/target style). */
+.buddy-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 90px;
+  min-height: 52px;
+  padding: 8px 18px;
+  font-size: 26px;
+  border: 2px solid var(--buddy-blue-edge);
+  background: var(--buddy-blue);
+  border-radius: 3px;
+}
+.buddy-row { display: flex; align-items: center; gap: 28px; margin: 14px 0; }
+.buddy-col { display: flex; flex-direction: column; gap: 14px; }
+
+/* Sticky-note label with a colored left bar. */
+.buddy-note {
+  display: inline-block;
+  padding: 4px 12px 4px 14px;
+  font-family: var(--buddy-font);
+  font-size: 19px;
+  line-height: 1.25;
+  color: var(--buddy-ink);
+  white-space: nowrap;
+  background: #fffdf3;
+  border-left: 5px solid var(--buddy-yellow-edge);
+  border-radius: 3px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
+}
+
+.blue   { --buddy-fill: var(--buddy-blue);   --buddy-edge: var(--buddy-blue-edge); }
+.red    { --buddy-fill: var(--buddy-red);    --buddy-edge: var(--buddy-red-edge); }
+.green  { --buddy-fill: var(--buddy-green);  --buddy-edge: var(--buddy-green-edge); }
+.yellow { --buddy-fill: var(--buddy-yellow); --buddy-edge: var(--buddy-yellow-edge); }
+.purple { --buddy-fill: var(--buddy-purple); --buddy-edge: var(--buddy-purple-edge); }
+.pink   { --buddy-fill: var(--buddy-pink);   --buddy-edge: var(--buddy-pink-edge); }
+.buddy-box.blue, .buddy-box.red, .buddy-box.green, .buddy-box.yellow, .buddy-box.purple, .buddy-box.pink {
+  background: var(--buddy-fill);
+  border-color: var(--buddy-edge);
+}
+.buddy-note.blue, .buddy-note.red, .buddy-note.green, .buddy-note.yellow, .buddy-note.purple, .buddy-note.pink {
+  border-left-color: var(--buddy-edge);
+  background: color-mix(in srgb, var(--buddy-fill) 35%, #fffdf3);
+}
+
+/* SVG layer used by kit.connect() for hand-drawn arrows between elements. */
+.buddy-arrows { position: fixed; inset: 0; pointer-events: none; overflow: visible; z-index: 5; }
+
+/* Close pill and error note added by buddy around every visual. */
+#buddy-clear {
+  position: fixed;
+  top: 8px;
+  right: 10px;
+  z-index: 1000;
+  padding: 3px 12px;
+  font: 600 12px system-ui, sans-serif;
+  color: #f4f4f5;
+  background: rgba(10, 10, 12, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  cursor: pointer;
+  user-select: none;
+}
+#buddy-clear:hover { background: rgba(40, 40, 46, 0.95); }
+#buddy-error {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 1000;
+  max-width: 70%;
+  padding: 6px 10px;
+  font: 12px ui-monospace, monospace;
+  color: #7f1d1d;
+  background: #fee2e2;
+  border-radius: 6px;
+  white-space: pre-wrap;
+}

@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Starts buddy from the repository's virtual environment. Used by the app-grid
+# launcher and the login autostart entry; output goes to a log file because there
+# is no terminal, and a desktop notification reports a failed start.
+
+repository_directory="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+python_executable="${repository_directory}/.venv/bin/python"
+log_directory="${XDG_STATE_HOME:-${HOME}/.local/state}/buddy"
+log_file="${log_directory}/buddy.log"
+
+mkdir -p "${log_directory}"
+# Keep the previous run's log for troubleshooting.
+[ -f "${log_file}" ] && mv -f "${log_file}" "${log_file}.1"
+
+notify_failure() {
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send --icon=buddy "buddy could not start" "$1"
+    fi
+    echo "$1" >&2
+}
+
+if [ ! -x "${python_executable}" ]; then
+    notify_failure "No virtual environment at ${repository_directory}/.venv — see README (설치)."
+    exit 1
+fi
+
+cd "${repository_directory}" || exit 1
+"${python_executable}" -m buddy "$@" >"${log_file}" 2>&1
+exit_status=$?
+
+# 0 = normal quit; 130/143 = Ctrl+C / logout.
+if [ "${exit_status}" -ne 0 ] && [ "${exit_status}" -ne 130 ] && [ "${exit_status}" -ne 143 ]; then
+    notify_failure "$(grep -v '^\s*$' "${log_file}" | tail -n 3)  (log: ${log_file})"
+fi
+exit "${exit_status}"

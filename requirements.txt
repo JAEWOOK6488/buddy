@@ -1,0 +1,9 @@
+# PyQt6 and PyQt6-WebEngine must share the same Qt minor version (no WebEngine 6.12 wheel exists).
+PyQt6==6.11.*
+PyQt6-Qt6==6.11.*
+PyQt6-WebEngine==6.11.*
+PyQt6-WebEngine-Qt6==6.11.*
+anthropic>=2.6,<3
+python-xlib>=0.33
+edge-tts>=7.0,<8
+python-dotenv>=1.0
