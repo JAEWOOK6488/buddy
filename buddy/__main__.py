@@ -30,7 +30,17 @@ def configure_visual_gpu() -> None:
         os.environ.pop(variable_name, None)
 
 
+def enable_crash_reports() -> None:
+    """Native crashes (Qt WebEngine's Chromium stops with SIGTRAP and no message) would
+    otherwise leave nothing in the log; dump every Python thread's stack instead."""
+    import faulthandler
+
+    faulthandler.enable(all_threads=True)
+    faulthandler.register(signal.SIGTRAP, all_threads=True, chain=True)
+
+
 def main() -> int:
+    enable_crash_reports()
     from .platform_check import find_display_session_problem
 
     session_problem = find_display_session_problem()
