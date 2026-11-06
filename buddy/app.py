@@ -69,6 +69,13 @@ STEP_SETTLE_MILLISECONDS = 800
 # Moving the real mouse into a screen corner before approving aborts the task (like pyautogui).
 FAILSAFE_CORNER_PIXELS = 3
 CLIPBOARD_RESTORE_DELAY_MILLISECONDS = 1500
+# In automatic mode, a step runs this long after it is shown, so the buddy can fly to the
+# target first and the user can read what is about to happen.
+AUTOMATIC_STEP_DELAY_MILLISECONDS = 700
+# The pointer counts as "where buddy left it" within this many logical pixels.
+SYNTHETIC_POINTER_TOLERANCE_PIXELS = 4
+# Long enough for the notch's fold animation (220 ms) to finish.
+NOTCH_FOLD_SECONDS = 0.3
 
 
 @dataclass
@@ -121,6 +128,11 @@ class BuddyController(QObject):
         self._task_step_timer = QTimer(self)
         self._task_step_timer.setSingleShot(True)
         self._task_step_timer.timeout.connect(self._ask_for_next_task_step)
+        self._automatic_step_timer = QTimer(self)
+        self._automatic_step_timer.setSingleShot(True)
+        self._automatic_step_timer.timeout.connect(lambda: self._run_proposed_step(is_automatic=True))
+        # Where buddy's own last pointer action left the mouse (logical coordinates).
+        self._last_synthetic_pointer_point = None
 
         # Point mode state while Ctrl+Alt is held.
         self._is_point_mode_active = False
@@ -162,7 +174,7 @@ class BuddyController(QObject):
     def _connect_signals(self) -> None:
         self._notch.question_submitted.connect(self._on_question_submitted)
         self._notch.escape_pressed.connect(self._on_notch_escape_pressed)
-        self._notch.action_approved.connect(self._on_action_approved)
+        self._notch.action_approved.connect(lambda: self._run_proposed_step(is_automatic=False))
 
         self._claude_responder.response_text_updated.connect(self._on_response_text_updated)
         self._claude_responder.response_completed.connect(self._on_response_completed)
@@ -443,9 +455,30 @@ class BuddyController(QObject):
             self._overlay.point_at(target_point, proposed_action.label or proposed_action.action_type)
 
         self._overlay.set_voice_state(BuddyVoiceState.IDLE)
-        self._notch.show_action_proposal(task_session.step_number, proposed_action.describe())
         if self._is_speech_enabled and speak_text:
             self._speech_player.speak(speak_text)
+        if self._step_needs_approval(proposed_action, task_session.target_window_id):
+            self._notch.show_action_proposal(task_session.step_number, proposed_action.describe())
+        else:
+            self._notch.show_action_running(task_session.step_number, proposed_action.describe())
+            self._automatic_step_timer.start(AUTOMATIC_STEP_DELAY_MILLISECONDS)
+
+    def _step_needs_approval(self, proposed_action: ProposedAction, target_window_id: Optional[int]) -> bool:
+        if self._config.task_approval == "each":
+            return True
+        if self._config.task_approval == "never":
+            return False
+        # "once": only a step that would run a command in a terminal asks first.
+        presses_enter = (proposed_action.action_type == "type" and "\n" in proposed_action.text) or (
+            proposed_action.action_type == "key"
+            and any(key_name.strip().lower() in ("return", "enter", "kp_enter") for key_name in proposed_action.keys.split("+"))
+        )
+        if not presses_enter:
+            return False
+        try:
+            return self._get_input_controller().is_terminal_window(target_window_id)
+        except InputControlError:
+            return True
 
     def _action_target_point(self, proposed_action: ProposedAction, screen_captures: List[ScreenCapture]):
         if proposed_action.x is None or proposed_action.y is None or not screen_captures:
@@ -457,6 +490,13 @@ class BuddyController(QObject):
 
     def _is_pointer_in_failsafe_corner(self) -> bool:
         cursor_point = QCursor.pos()
+        last_point = self._last_synthetic_pointer_point
+        if last_point is not None and (
+            abs(cursor_point.x() - last_point.x()) <= SYNTHETIC_POINTER_TOLERANCE_PIXELS
+            and abs(cursor_point.y() - last_point.y()) <= SYNTHETIC_POINTER_TOLERANCE_PIXELS
+        ):
+            # Buddy itself put the mouse there (e.g. clicked Activities); not the user's failsafe.
+            return False
         cursor_screen = QGuiApplication.screenAt(cursor_point)
         if cursor_screen is None:
             return False
@@ -471,7 +511,8 @@ class BuddyController(QObject):
         )
         return is_at_horizontal_edge and is_at_vertical_edge
 
-    def _on_action_approved(self) -> None:
+    def _run_proposed_step(self, is_automatic: bool) -> None:
+        """Runs the proposed step: after the user's Enter, or on its own in automatic mode."""
         task_session = self._task_session
         if task_session is None or task_session.proposed_action is None:
             return
@@ -484,7 +525,9 @@ class BuddyController(QObject):
             self._notch.show_error("Mouse was in a screen corner, so the task was stopped (failsafe).")
             return
 
-        self._speech_player.stop()
+        if not is_automatic:
+            # The user is driving step by step; the previous explanation is no longer needed.
+            self._speech_player.stop()
         self._overlay.cancel_pointing()
         self._notch.set_status("acting")
 
@@ -527,9 +570,11 @@ class BuddyController(QObject):
         target_point = self._action_target_point(proposed_action, task_session.proposal_screen_captures)
         if target_point is None:
             raise ValueError("the step has no position")
+        self._move_notch_out_of_the_way(target_point)
         pointer_anchor = self._point_mode_detector.current_anchor()
         physical_x, physical_y = pointer_anchor.logical_to_physical(target_point)
 
+        self._last_synthetic_pointer_point = target_point
         if action_type == "click":
             input_controller.click(physical_x, physical_y, LEFT_BUTTON, 1)
         elif action_type == "double_click":
@@ -545,7 +590,18 @@ class BuddyController(QObject):
             )
             end_x, end_y = pointer_anchor.logical_to_physical(end_point)
             input_controller.drag(physical_x, physical_y, end_x, end_y)
+            self._last_synthetic_pointer_point = end_point
         return STEP_SETTLE_MILLISECONDS
+
+    def _move_notch_out_of_the_way(self, target_point) -> None:
+        """The notch is hidden from screenshots, so a target can lie under it; fold it first
+        so the click reaches the app instead of the notch."""
+        if self._notch.is_expanded and self._notch.geometry().contains(target_point.toPoint()):
+            self._notch.collapse()
+            deadline = time.monotonic() + NOTCH_FOLD_SECONDS
+            while time.monotonic() < deadline:
+                QApplication.processEvents()
+                time.sleep(0.01)
 
     def _paste_text(self, input_controller: InputController, target_window_id: Optional[int], text: str) -> None:
         """Pastes through the clipboard (works for Korean and any Unicode), then restores it.
@@ -587,6 +643,8 @@ class BuddyController(QObject):
     def _end_task_session(self) -> None:
         self._task_session = None
         self._task_step_timer.stop()
+        self._automatic_step_timer.stop()
+        self._last_synthetic_pointer_point = None
         self._notch.clear_action_proposal()
 
     # ----- stopping -----
@@ -704,6 +762,11 @@ class BuddyController(QObject):
             # Still waiting for the user to approve the proposed step.
             self._overlay.set_voice_state(BuddyVoiceState.IDLE)
             self._notch.set_status("waiting")
+            return
+        if self._task_session is not None:
+            # An automatic task is still running between steps.
+            self._overlay.set_voice_state(BuddyVoiceState.IDLE)
+            self._notch.set_status("acting")
             return
         if self._active_request_id is not None and self._early_spoken_text is not None:
             # Done talking, the visual is still being written.
