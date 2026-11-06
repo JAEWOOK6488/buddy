@@ -20,7 +20,10 @@ from .pointer_inspector import PointerAnchor
 POLL_INTERVAL_MILLISECONDS = 30
 # Ctrl+Alt must be held alone this long before point mode starts, so quick chords
 # like Ctrl+Alt+Space (the notch hotkey) or Ctrl+Alt+T never flash a highlight.
-DEFAULT_ARMING_DELAY_SECONDS = 0.35
+DEFAULT_ARMING_DELAY_SECONDS = 0.6
+# Once active, Ctrl+Alt must stay down at least this long for the release to ask buddy.
+# A shorter hold (a brief or accidental press) just clears the highlight.
+MINIMUM_ACTIVE_SECONDS = 0.5
 
 MODIFIER_KEYSYM_NAMES = {
     "control": ("Control_L", "Control_R"),
@@ -54,6 +57,7 @@ class PointModeDetector(QObject):
 
         self._phase = _PointModePhase.IDLE
         self._arming_started_at = 0.0
+        self._active_started_at = 0.0
         self._last_physical_position: Optional[tuple] = None
         self._last_anchor: Optional[PointerAnchor] = None
         self._is_enabled = True
@@ -131,6 +135,7 @@ class PointModeDetector(QObject):
                 self._phase = _PointModePhase.IDLE
             elif time.monotonic() - self._arming_started_at >= self._arming_delay_seconds:
                 self._phase = _PointModePhase.ACTIVE
+                self._active_started_at = time.monotonic()
                 self._last_anchor = self._current_anchor()
                 self._last_physical_position = (self._last_anchor.physical_x, self._last_anchor.physical_y)
                 self.point_mode_started.emit(self._last_anchor)
@@ -141,7 +146,10 @@ class PointModeDetector(QObject):
                 self.point_mode_cancelled.emit()
             elif not (is_control_down and is_alt_down):
                 self._phase = _PointModePhase.WAITING_FOR_RELEASE if (is_control_down or is_alt_down) else _PointModePhase.IDLE
-                self.point_mode_released.emit(self._current_anchor())
+                if time.monotonic() - self._active_started_at < MINIMUM_ACTIVE_SECONDS:
+                    self.point_mode_cancelled.emit()
+                else:
+                    self.point_mode_released.emit(self._current_anchor())
             else:
                 pointer_anchor = self._current_anchor()
                 physical_position = (pointer_anchor.physical_x, pointer_anchor.physical_y)

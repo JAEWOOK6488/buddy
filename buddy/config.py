@@ -46,10 +46,24 @@ class BuddyConfig:
     reply_language: str
     # Hold Ctrl+Alt and point to have buddy explain the element under the mouse.
     point_mode_enabled: bool
+    # How mouse/keyboard tasks are approved:
+    #   once  - the request itself is the approval; steps run to the end automatically,
+    #           except a step that presses Enter in a terminal (runs a command) still asks
+    #   never - every step runs automatically, terminals included
+    #   each  - every step waits for Enter
+    task_approval: str = "once"
     # Screenshots are downscaled so the longest side is at most this many pixels.
     screenshot_max_dimension: int = 1280
     # Only the most recent exchanges are resent to keep the request small.
     conversation_history_limit: int = 10
+
+
+TASK_APPROVAL_MODES = ("once", "never", "each")
+
+
+def _read_task_approval() -> str:
+    task_approval = os.environ.get("BUDDY_TASK_APPROVAL", "once").strip().lower()
+    return task_approval if task_approval in TASK_APPROVAL_MODES else "once"
 
 
 def _read_bool(variable_name: str, default_value: bool) -> bool:
@@ -94,6 +108,7 @@ def load_config() -> BuddyConfig:
         english_speech_voice=os.environ.get("BUDDY_VOICE_EN", "en-US-AriaNeural"),
         reply_language=_read_configured_language(),
         point_mode_enabled=_read_bool("BUDDY_POINT_MODE", True),
+        task_approval=_read_task_approval(),
     )
 
 

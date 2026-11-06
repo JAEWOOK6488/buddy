@@ -120,6 +120,7 @@ class NotchWindow(QWidget):
         self._has_answer = False
         self._animation_phase = 0.0
 
+        self._stop_hotkey_display_text = stop_hotkey_display_text
         self._build_content(hotkey_display_text, stop_hotkey_display_text)
 
         self._geometry_animation = QPropertyAnimation(self, b"geometry", self)
@@ -351,6 +352,14 @@ class NotchWindow(QWidget):
         self._question_input.setPlaceholderText("Enter to approve this step…")
         self.set_status("waiting")
         self.expand(should_focus_input=True)
+
+    def show_action_running(self, step_number: int, action_description: str) -> None:
+        """Shows the step being carried out automatically; leaves the keyboard with the app."""
+        self._is_action_pending = False
+        self._action_label.setText(f"Step {step_number}: {action_description}\n{self._stop_hotkey_display_text} = stop")
+        self._action_label.show()
+        self.set_status("acting")
+        self.expand(should_focus_input=False)
 
     def clear_action_proposal(self) -> None:
         self._is_action_pending = False

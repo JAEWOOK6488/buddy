@@ -13,23 +13,32 @@ mkdir -p "${log_directory}"
 [ -f "${log_file}" ] && mv -f "${log_file}" "${log_file}.1"
 
 notify_failure() {
+    # $1 = title, $2 = message
     if command -v notify-send >/dev/null 2>&1; then
-        notify-send --icon=buddy "buddy could not start" "$1"
+        notify-send --icon=buddy "$1" "$2"
     fi
-    echo "$1" >&2
+    echo "$1: $2" >&2
 }
 
 if [ ! -x "${python_executable}" ]; then
-    notify_failure "No virtual environment at ${repository_directory}/.venv — see README (설치)."
+    notify_failure "buddy could not start" "No virtual environment at ${repository_directory}/.venv — see README (설치)."
     exit 1
 fi
 
 cd "${repository_directory}" || exit 1
+started_at=$(date +%s)
 "${python_executable}" -m buddy "$@" >"${log_file}" 2>&1
 exit_status=$?
 
 # 0 = normal quit; 130/143 = Ctrl+C / logout.
 if [ "${exit_status}" -ne 0 ] && [ "${exit_status}" -ne 130 ] && [ "${exit_status}" -ne 143 ]; then
-    notify_failure "$(grep -v '^\s*$' "${log_file}" | tail -n 3)  (log: ${log_file})"
+    if [ $(( $(date +%s) - started_at )) -lt 15 ]; then
+        title="buddy could not start"
+    else
+        title="buddy stopped unexpectedly"
+    fi
+    # Skip the audio decoder's chatter so the real error is what shows.
+    last_lines="$(grep -vE '^\s*$|^\s|^Input #|^\[mp3 |qt\.multimedia' "${log_file}" | tail -n 3)"
+    notify_failure "${title}" "${last_lines:-exit status ${exit_status}}  (log: ${log_file})"
 fi
 exit "${exit_status}"

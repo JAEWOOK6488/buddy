@@ -38,7 +38,7 @@ Super 키 → `buddy`로 실행해요. 제거는 `packaging/install-desktop.sh -
 
 | 키 | 동작 |
 |---|---|
-| `Enter` | 질문 보내기 / 작업 단계 제안 중이면 그 단계 실행 |
+| `Enter` | 질문 보내기 / 승인을 기다리는 작업 단계 실행 |
 | `Esc` | 답변 멈추기, 한 번 더 누르면 노치 접기 / 작업 중단 |
 
 **시각화 창**: 드래그 = 회전, 휠 = 확대, 오른쪽 드래그 = 이동, `Esc` 또는 `× Clear` = 닫기
@@ -50,9 +50,9 @@ Super 키 → `buddy`로 실행해요. 제거는 `packaging/install-desktop.sh -
 - **질문**: 모든 모니터 스크린샷과 함께 묻고, 답을 Edge TTS로 읽어줘요.
 - **가리키기 모드**: 접근성(AT-SPI) → 창 경계 → Claude 보정 순으로 요소를 찾아요.
   Chrome·Electron 앱도 정확히 잡으려면 `gsettings set org.gnome.desktop.interface toolkit-accessibility true`.
-- **작업 시키기**: "PDF로 내보내줘"처럼 요청하면 한 단계씩 제안하고, `Enter`로 승인해야 실행해요.
-  승인할 때 마우스가 화면 모서리에 있으면 중단돼요. 25단계를 넘으면 자동으로 멈춰요.
-  터미널에도 입력할 수 있으니 제안 내용을 확인하고 승인하세요.
+- **작업 시키기**: "PDF로 내보내줘"처럼 요청하면 끝날 때까지 스스로 진행해요(단계마다 화면을 다시 보고 다음 동작을 정해요).
+  멈추려면 `Ctrl+Alt+Backspace`, 또는 마우스를 화면 모서리로 밀어두면 다음 단계 전에 멈춰요. 25단계를 넘으면 자동으로 멈춰요.
+  **터미널에서 Enter로 명령을 실행하는 단계만** 노치에서 `Enter`로 승인을 받아요(`BUDDY_TASK_APPROVAL`로 변경).
 - **시각화**: "시각화해줘", "3D로 보여줘"라고 하면 투명 창에 3D 모델·설명 카드·구조도를 띄워요.
   창은 격리돼 있어 인터넷·파일에 접근하지 못해요.
 
@@ -65,6 +65,7 @@ Super 키 → `buddy`로 실행해요. 제거는 `packaging/install-desktop.sh -
 | `BUDDY_NOTCH_HOTKEY` | `ctrl+alt+space` | 노치 단축키 |
 | `BUDDY_STOP_HOTKEY` | `ctrl+alt+BackSpace` | 멈추기 단축키 |
 | `BUDDY_POINT_MODE` | `true` | `false`면 Ctrl+Alt 가리키기 끔 |
+| `BUDDY_TASK_APPROVAL` | `once` | 작업 승인: `once`=요청 한 번(터미널 명령 실행만 승인), `never`=승인 없음, `each`=단계마다 |
 | `BUDDY_LANGUAGE` | (자동) | 답변 언어 고정, 예: `ko` |
 | `BUDDY_SPEECH_ENABLED` | `true` | 읽어주기 |
 | `BUDDY_VISUAL_GPU` | `auto` | NVIDIA PRIME 노트북에서 시각화 GPU (`auto`=내장 GPU, `nvidia`) |
