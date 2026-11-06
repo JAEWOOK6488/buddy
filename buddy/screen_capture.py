@@ -12,7 +12,9 @@ POINTER_MARKER_COLOR = QColor(239, 68, 68)
 ELEMENT_MARKER_COLOR = QColor(249, 115, 22)
 TRAIL_MARKER_COLOR = QColor(234, 179, 8)
 # A trail shorter than this (in logical pixels) is jitter, not a gesture.
-MINIMUM_MEANINGFUL_TRAIL_LENGTH = 40.0
+MINIMUM_MEANINGFUL_TRAIL_LENGTH = 120.0
+# ...and it must also spread at least this far, so hand tremor along a line doesn't count.
+MINIMUM_MEANINGFUL_TRAIL_SPAN = 40.0
 
 
 @dataclass
@@ -30,7 +32,11 @@ class PointerAnnotation:
             previous_point = self.trail_points[point_index - 1]
             current_point = self.trail_points[point_index]
             trail_length += ((current_point.x() - previous_point.x()) ** 2 + (current_point.y() - previous_point.y()) ** 2) ** 0.5
-        return trail_length >= MINIMUM_MEANINGFUL_TRAIL_LENGTH
+        if trail_length < MINIMUM_MEANINGFUL_TRAIL_LENGTH:
+            return False
+        x_values = [trail_point.x() for trail_point in self.trail_points]
+        y_values = [trail_point.y() for trail_point in self.trail_points]
+        return max(max(x_values) - min(x_values), max(y_values) - min(y_values)) >= MINIMUM_MEANINGFUL_TRAIL_SPAN
 
 
 @dataclass
