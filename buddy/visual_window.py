@@ -176,7 +176,9 @@ if is_web_engine_available():
 
         def acceptNavigationRequest(self, url, navigation_type, is_main_frame) -> bool:  # noqa: N802
             if url.scheme() == "buddy" and url.path() == CLOSE_REQUEST_PATH:
-                self.close_requested.emit()
+                # Deferred: closing loads about:blank, and starting a navigation from inside
+                # this navigation check makes Chromium abort the whole process (SIGTRAP).
+                QTimer.singleShot(0, self.close_requested.emit)
                 return False
             # Only the visual itself may load; links and redirects elsewhere are refused.
             return url == VISUAL_PAGE_URL or url == BLANK_PAGE_URL
